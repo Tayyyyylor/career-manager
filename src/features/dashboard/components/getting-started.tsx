@@ -1,6 +1,5 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
 import { ChevronRight, Circle, CircleCheck } from "lucide-react";
 
 import {
@@ -29,32 +28,32 @@ type Step = {
 function buildSteps(stats: DashboardStats): Step[] {
   return [
     {
-      label: "Compléter mon profil",
-      description: "Identité, coordonnées et présentation professionnelle.",
-      href: routes.profile.href,
-      done: stats.hasProfile,
-    },
-    {
-      label: "Ajouter mes compétences",
-      description: "Technologies, outils, méthodes et langues.",
-      href: routes.skills.href,
-      done: stats.skills > 0,
-    },
-    {
-      label: "Renseigner mes expériences",
-      description: "Postes occupés, missions et réalisations.",
-      href: routes.experiences.href,
-      done: stats.experiences > 0,
-    },
-    {
-      label: "Importer mon CV générique",
-      description: "Le PDF de référence pour les versions adaptées.",
+      label: "Importer mon CV",
+      description: "Puis « Remplir mon profil » : le reste se pré-remplit tout seul.",
       href: routes.resumes.href,
       done: stats.genericResumes > 0,
     },
     {
+      label: "Vérifier mon profil",
+      description: "Nom, titre professionnel et coordonnées.",
+      href: routes.profile.href,
+      done: stats.hasProfile,
+    },
+    {
+      label: "Vérifier mes compétences",
+      description: "Technologies, outils de test, méthodes et langues.",
+      href: routes.skills.href,
+      done: stats.skills > 0,
+    },
+    {
+      label: "Vérifier mes expériences",
+      description: "Dates et réalisations : elles comptent dans la note.",
+      href: routes.experiences.href,
+      done: stats.experiences > 0,
+    },
+    {
       label: "Analyser une première offre",
-      description: "Mesurer la correspondance entre une annonce et votre CV.",
+      description: "Mesurer la correspondance entre une annonce et ton CV.",
       href: routes.offers.href,
       done: stats.analyses > 0,
     },
@@ -62,7 +61,6 @@ function buildSteps(stats: DashboardStats): Step[] {
 }
 
 export async function GettingStarted() {
-  await connection();
   const steps = buildSteps(await getDashboardStats());
   const completed = steps.filter((step) => step.done).length;
 

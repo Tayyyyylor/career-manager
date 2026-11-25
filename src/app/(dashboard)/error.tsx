@@ -25,7 +25,7 @@ export default function DashboardError({ error, retry }: ErrorPageProps) {
     <EmptyState
       icon={TriangleAlert}
       title="Une erreur est survenue"
-      description="Impossible d'afficher cette page. Vérifiez que la base de données est accessible, puis réessayez."
+      description="Impossible d'afficher cette page. Vérifie ta connexion, puis réessaie."
     >
       <Button variant="outline" onClick={() => retry()}>
         <RotateCcw data-icon="inline-start" />

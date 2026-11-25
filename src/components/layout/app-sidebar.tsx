@@ -6,16 +6,25 @@ import {
   SidebarNav,
   SidebarNavFallback,
 } from "@/components/layout/sidebar-nav";
+import { UserMenu } from "@/components/layout/user-menu";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { siteConfig } from "@/config/site";
+import { requireUser } from "@/lib/session";
+
+async function SidebarUser() {
+  const user = await requireUser();
+  return <UserMenu name={user.name} email={user.email} />;
+}
 
 export function AppSidebar() {
   return (
@@ -47,6 +56,12 @@ export function AppSidebar() {
           <SidebarNav />
         </Suspense>
       </SidebarContent>
+
+      <SidebarFooter>
+        <Suspense fallback={<SidebarMenuSkeleton showIcon />}>
+          <SidebarUser />
+        </Suspense>
+      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

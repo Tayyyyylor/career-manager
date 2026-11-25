@@ -11,7 +11,8 @@ import {
   GettingStarted,
   GettingStartedSkeleton,
 } from "@/features/dashboard/components/getting-started";
-import { OfferAnalysisCta } from "@/features/dashboard/components/offer-analysis-cta";
+import { RecentAnalyses } from "@/features/dashboard/components/recent-analyses";
+import { ListSkeleton } from "@/components/shared/list-skeleton";
 
 const page = routes.dashboard;
 
@@ -32,7 +33,9 @@ export default function DashboardPage() {
             <GettingStarted />
           </Suspense>
         </div>
-        <OfferAnalysisCta />
+        <Suspense fallback={<ListSkeleton items={1} />}>
+          <RecentAnalyses />
+        </Suspense>
       </div>
     </>
   );

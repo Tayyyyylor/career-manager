@@ -4,6 +4,7 @@ import {
   CircleUserRound,
   FileText,
   FolderKanban,
+  GraduationCap,
   LayoutDashboard,
   ScanSearch,
   Send,
@@ -27,14 +28,14 @@ export type NavGroup = {
 export const routes = {
   dashboard: {
     title: "Tableau de bord",
-    description: "Vue d'ensemble de votre parcours et de vos candidatures.",
+    description: "Vue d'ensemble de ton parcours et de tes candidatures.",
     href: "/",
     icon: LayoutDashboard,
   },
   profile: {
     title: "Mon profil",
     description:
-      "Vos informations personnelles et votre présentation professionnelle.",
+      "Tes informations personnelles et ta présentation professionnelle.",
     href: "/profile",
     icon: CircleUserRound,
   },
@@ -47,33 +48,39 @@ export const routes = {
   },
   experiences: {
     title: "Mes expériences",
-    description: "Votre historique professionnel : postes, missions et réalisations.",
+    description: "Ton historique professionnel : postes, missions et réalisations.",
     href: "/experiences",
     icon: BriefcaseBusiness,
   },
   projects: {
     title: "Mes projets",
     description:
-      "Les projets personnels et professionnels qui illustrent votre savoir-faire.",
+      "Les projets personnels et professionnels qui illustrent ton savoir-faire.",
     href: "/projects",
     icon: FolderKanban,
+  },
+  education: {
+    title: "Mes formations",
+    description: "Diplômes, certifications et formations suivies.",
+    href: "/education",
+    icon: GraduationCap,
   },
   offers: {
     title: "Analyse des offres",
     description:
-      "Évaluez la correspondance entre une offre d'emploi et votre CV.",
+      "Évalue la correspondance entre une offre d'emploi et ton CV.",
     href: "/offers",
     icon: ScanSearch,
   },
   resumes: {
     title: "Mes CV",
-    description: "Votre CV générique et ses versions adaptées à chaque offre.",
+    description: "Ton CV générique et ses versions adaptées à chaque offre.",
     href: "/resumes",
     icon: FileText,
   },
   applications: {
     title: "Mes candidatures",
-    description: "Suivez l'avancement de chacune de vos candidatures.",
+    description: "Suis l'avancement de chacune de tes candidatures.",
     href: "/applications",
     icon: Send,
   },
@@ -83,7 +90,13 @@ export const navigation: readonly NavGroup[] = [
   { label: "Général", items: [routes.dashboard] },
   {
     label: "Mon parcours",
-    items: [routes.profile, routes.skills, routes.experiences, routes.projects],
+    items: [
+      routes.profile,
+      routes.skills,
+      routes.experiences,
+      routes.projects,
+      routes.education,
+    ],
   },
   {
     label: "Candidatures",

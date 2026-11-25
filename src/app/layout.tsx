@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { siteConfig } from "@/config/site";
 import { themeInitScript } from "@/lib/theme";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <ThemeProvider>
           <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+          <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

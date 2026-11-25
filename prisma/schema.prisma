@@ -1,8 +1,9 @@
 // Schéma de données de Career Manager.
 // Documentation : https://pris.ly/d/prisma-schema
 //
-// Application mono-utilisateur : pas de modèle User pour l'instant.
-// Le profil est une ligne unique (singleton) gérée côté application.
+// Application multi-utilisateur : chaque donnée métier appartient à un User.
+// Les modèles User / Session / Account / Verification sont ceux attendus par
+// Better Auth (https://www.better-auth.com/docs/concepts/database).
 
 generator client {
   provider = "prisma-client"
@@ -13,10 +14,79 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Authentification (Better Auth) ──────────────────────────────────────────
+
+model User {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  profile       Profile?
+  skills        Skill[]
+  experiences   Experience[]
+  projects      Project[]
+  educations    Education[]
+  jobOffers     JobOffer[]
+  resumes       Resume[]
+  applications  Application[]
+  aiRequests    AiRequest[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
 // ─── Profil ──────────────────────────────────────────────────────────────────
 
 model Profile {
   id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   firstName   String?
   lastName    String?
   headline    String?
@@ -27,6 +97,8 @@ model Profile {
   websiteUrl  String?
   linkedinUrl String?
   githubUrl   String?
+  /// Barème d'affichage des notes : 100 ou 20.
+  scoreScale  Int      @default(100)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -51,13 +123,17 @@ enum SkillLevel {
 
 model Skill {
   id          String        @id @default(cuid())
-  name        String        @unique
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
   category    SkillCategory @default(TECHNICAL)
   level       SkillLevel?
   experiences Experience[]
   projects    Project[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@unique([userId, name])
 }
 
 // ─── Expériences ─────────────────────────────────────────────────────────────
@@ -73,6 +149,8 @@ enum EmploymentType {
 
 model Experience {
   id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   position       String
   company        String
   location       String?
@@ -87,13 +165,15 @@ model Experience {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  @@index([startDate])
+  @@index([userId, startDate])
 }
 
 // ─── Projets ─────────────────────────────────────────────────────────────────
 
 model Project {
   id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   description   String?
   role          String?
@@ -107,6 +187,7 @@ model Project {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  @@index([userId])
   @@index([experienceId])
 }
 
@@ -114,6 +195,8 @@ model Project {
 
 model Education {
   id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   institution  String
   degree       String
   fieldOfStudy String?
@@ -123,12 +206,16 @@ model Education {
   description  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
 }
 
 // ─── Offres d'emploi & analyses ──────────────────────────────────────────────
 
 model JobOffer {
   id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   title        String
   company      String?
   location     String?
@@ -140,23 +227,34 @@ model JobOffer {
   applications Application[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
+
+  @@index([userId, createdAt])
 }
 
-/// Résultat de la comparaison entre une offre et un CV.
-model OfferAnalysis {
-  id         String   @id @default(cuid())
-  jobOfferId String
-  jobOffer   JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
-  resumeId   String?
-  resume     Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  score      Int
-  /// Barème de la note (ex. 100 ou 20).
-  maxScore   Int      @default(100)
-  /// Détail du calcul (critères, points forts, manques…). Structure à définir.
-  details    Json?
-  createdAt  DateTime @default(now())
+enum AnalysisMethod {
+  /// Moteur de règles local (gratuit, déterministe).
+  RULES
+  /// Analyse par un modèle Claude (API Anthropic).
+  AI
+}
 
-  @@index([jobOfferId])
+/// Résultat de la comparaison entre une offre et le parcours / CV de l'utilisateur.
+model OfferAnalysis {
+  id         String         @id @default(cuid())
+  jobOfferId String
+  jobOffer   JobOffer       @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  resumeId   String?
+  resume     Resume?        @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  method     AnalysisMethod
+  /// Modèle utilisé pour une analyse IA.
+  model      String?
+  /// Note normalisée sur 100 (convertie à l'affichage selon le barème du profil).
+  score      Int
+  /// Détail du calcul — structure `AnalysisDetails` (src/features/analysis/types.ts).
+  details    Json
+  createdAt  DateTime       @default(now())
+
+  @@index([jobOfferId, createdAt])
   @@index([resumeId])
 }
 
@@ -165,26 +263,37 @@ model OfferAnalysis {
 enum ResumeKind {
   /// CV générique importé (PDF de référence).
   GENERIC
-  /// CV adapté à une offre précise.
+  /// CV adapté à une offre précise, généré par l'application.
   TAILORED
 }
 
 model Resume {
-  id           String          @id @default(cuid())
-  title        String
-  kind         ResumeKind      @default(GENERIC)
-  fileName     String?
-  /// Chemin du fichier dans le stockage (local ou distant).
-  filePath     String?
-  mimeType     String?
-  fileSize     Int?
-  jobOfferId   String?
-  jobOffer     JobOffer?       @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
-  analyses     OfferAnalysis[]
-  applications Application[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  kind          ResumeKind      @default(GENERIC)
+  /// CV utilisé par défaut pour les analyses.
+  isDefault     Boolean         @default(false)
+  fileName      String?
+  mimeType      String?
+  fileSize      Int?
+  /// Contenu du PDF importé (CV générique).
+  fileData      Bytes?
+  /// Texte extrait du PDF, utilisé par le moteur d'analyse.
+  extractedText String?
+  /// Contenu structuré d'un CV adapté — structure `TailoredResumeContent`.
+  content       Json?
+  /// Méthode de génération d'un CV adapté.
+  method        AnalysisMethod?
+  jobOfferId    String?
+  jobOffer      JobOffer?       @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
+  analyses      OfferAnalysis[]
+  applications  Application[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
+  @@index([userId, kind])
   @@index([jobOfferId])
 }
 
@@ -201,10 +310,13 @@ enum ApplicationStatus {
 
 model Application {
   id         String            @id @default(cuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   company    String
   position   String
   status     ApplicationStatus @default(TO_APPLY)
   appliedAt  DateTime?         @db.Date
+  url        String?
   notes      String?
   jobOfferId String?
   jobOffer   JobOffer?         @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
@@ -213,7 +325,30 @@ model Application {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
-  @@index([status])
+  @@index([userId, status])
   @@index([jobOfferId])
   @@index([resumeId])
+}
+
+// ─── Suivi de l'usage de l'IA ────────────────────────────────────────────────
+
+enum AiRequestKind {
+  ANALYSIS
+  TAILORING
+  /// Extraction du parcours depuis un CV PDF.
+  IMPORT
+}
+
+/// Journal des appels à l'API Anthropic (quota quotidien et suivi des coûts).
+model AiRequest {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         AiRequestKind
+  model        String
+  inputTokens  Int           @default(0)
+  outputTokens Int           @default(0)
+  createdAt    DateTime      @default(now())
+
+  @@index([userId, createdAt])
 }

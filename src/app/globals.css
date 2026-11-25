@@ -128,3 +128,30 @@
     @apply font-sans;
   }
 }
+/* ─── Impression des CV adaptés ─────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #cv-document,
+  #cv-document * {
+    visibility: visible;
+  }
+
+  #cv-document {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+}

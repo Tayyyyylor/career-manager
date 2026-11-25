@@ -2,5 +2,5 @@ export const siteConfig = {
   name: "Career Manager",
   tagline: "Gestion de carrière",
   description:
-    "Centralisez votre parcours professionnel et préparez des candidatures ciblées.",
+    "Centralise ton parcours professionnel et prépare des candidatures ciblées.",
 } as const;
