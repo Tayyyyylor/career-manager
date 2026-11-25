@@ -286,6 +286,9 @@ model Resume {
   content       Json?
   /// Méthode de génération d'un CV adapté.
   method        AnalysisMethod?
+  /// Mise en forme — structure `ResumeStyle` (src/features/resumes/style/types.ts).
+  /// CV générique : style détecté dans le PDF. CV adapté : style choisi.
+  style         Json?
   jobOfferId    String?
   jobOffer      JobOffer?       @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
   analyses      OfferAnalysis[]

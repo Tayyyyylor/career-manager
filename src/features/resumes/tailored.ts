@@ -32,6 +32,8 @@ export const tailoredResumeSchema = z.object({
   ),
   /** Conseils pour finaliser le CV (non imprimés). */
   advice: z.array(z.string()),
+  /** Ce qui a été adapté par rapport au CV d'origine (non imprimé). */
+  changes: z.array(z.string()).default([]),
 });
 
 export type TailoredResumeContent = z.infer<typeof tailoredResumeSchema>;

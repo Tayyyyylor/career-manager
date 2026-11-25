@@ -3,6 +3,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import type { CandidateData } from "@/features/analysis/candidate";
+import type { AnalysisDetails } from "@/features/analysis/types";
 import { EMPLOYMENT_TYPE_LABELS } from "@/features/experiences/constants";
 import { SKILL_CATEGORY_LABELS, SKILL_LEVEL_LABELS } from "@/features/skills/constants";
 import type { EmploymentType, SkillCategory, SkillLevel } from "@/generated/prisma/enums";
@@ -99,10 +100,38 @@ export function describeOffer(offer: {
  * Contenu du message utilisateur : le CV PDF (s'il existe) puis le profil
  * et l'offre balisés. Les contenus fournis sont des données, pas des consignes.
  */
+/** Résumé d'une analyse existante, pour guider la rédaction d'un CV adapté. */
+export function describeAnalysis(details: AnalysisDetails | null): string | null {
+  if (!details) return null;
+  const list = (items: readonly string[]) => items.slice(0, 15).join(", ");
+  return escapeTags(
+    [
+      `Synthèse : ${details.summary}`,
+      details.matchedSkills.length
+        ? `Compétences demandées que le candidat possède : ${list(details.matchedSkills)}`
+        : null,
+      details.missingSkills.length
+        ? `Compétences demandées absentes du parcours (ne pas les ajouter au CV) : ${list(details.missingSkills)}`
+        : null,
+      details.keywords?.missing.length
+        ? `Mots-clés de l'annonce absents du CV : ${list(details.keywords.missing)}`
+        : null,
+      details.recommendations.length ? `Recommandations : ${details.recommendations.join(" / ")}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+}
+
+function analysisBlock(analysis: string | null | undefined): string {
+  return analysis ? ["", "<analyse_offre>", analysis, "</analyse_offre>"].join("\n") : "";
+}
+
 export function buildUserContent(
   data: CandidateData,
   offer: Parameters<typeof describeOffer>[0],
   task: string,
+  analysis?: string | null,
 ): Anthropic.Beta.BetaContentBlockParam[] {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
 
@@ -125,7 +154,7 @@ export function buildUserContent(
         ? "Le document joint est le CV générique du candidat."
         : "Le candidat n'a pas fourni de CV PDF : base-toi sur son profil.",
       "",
-      profileAndOffer(data, offer),
+      profileAndOffer(data, offer) + analysisBlock(analysis),
       "",
       DATA_NOTICE,
       "",
@@ -159,6 +188,7 @@ export function buildManualBody(
   data: CandidateData,
   offer: Parameters<typeof describeOffer>[0],
   task: string,
+  analysis?: string | null,
 ): string {
   const resumeText = data.resume?.extractedText;
   return [
@@ -168,7 +198,7 @@ export function buildManualBody(
         ? "Le texte du CV n'a pas pu être lu automatiquement : joins le PDF du CV à ce message."
         : "Le candidat n'a pas fourni de CV : base-toi sur son profil.",
     "",
-    profileAndOffer(data, offer),
+    profileAndOffer(data, offer) + analysisBlock(analysis),
     "",
     DATA_NOTICE,
     "",

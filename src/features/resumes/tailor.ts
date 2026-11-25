@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { CandidateData } from "@/features/analysis/candidate";
 import { detectSkills } from "@/features/analysis/engine/skills";
 import { containsTerm, normalize } from "@/features/analysis/engine/text";
-import { buildUserContent } from "@/features/analysis/prompt-context";
+import { buildUserContent, describeAnalysis } from "@/features/analysis/prompt-context";
 import type { AnalysisDetails } from "@/features/analysis/types";
 import type { TailoredResumeContent } from "@/features/resumes/tailored";
 import { SKILL_CATEGORIES, SKILL_CATEGORY_LABELS } from "@/features/skills/constants";
@@ -66,12 +66,13 @@ export function tailorWithRules(
     return { label: SKILL_CATEGORY_LABELS[category as SkillCategory], items };
   }).filter((group) => group.items.length > 0);
 
+  let reordered = 0;
   const experiences = raw.experiences.slice(0, MAX_EXPERIENCES).map((experience) => {
-    const bullets = [...experience.achievements]
+    const ranked = [...experience.achievements]
       .map((text, index) => ({ text, index, score: relevance(text, terms) }))
-      .sort((a, b) => b.score - a.score || a.index - b.index)
-      .slice(0, MAX_BULLETS)
-      .map((bullet) => bullet.text);
+      .sort((a, b) => b.score - a.score || a.index - b.index);
+    if (ranked.some((bullet, position) => bullet.index !== position)) reordered += 1;
+    const bullets = ranked.slice(0, MAX_BULLETS).map((bullet) => bullet.text);
     return {
       position: experience.position,
       company: experience.company,
@@ -106,7 +107,24 @@ export function tailorWithRules(
     details: item.description,
   }));
 
+  // Ce qui a réellement été fait, pour l'encart « Ce qui a été adapté ».
+  const highlighted = raw.skills.filter((skill) => relevance(skill.name, terms) > 0).map((skill) => skill.name);
+  const changes = [
+    highlighted.length > 0
+      ? `Compétences demandées par l'offre placées en tête : ${highlighted.slice(0, 8).join(", ")}.`
+      : "Aucune de tes compétences ne correspond directement aux exigences de l'offre.",
+    reordered > 0
+      ? `Réalisations réordonnées pour mettre en avant celles qui répondent à l'offre (${reordered} expérience${reordered > 1 ? "s" : ""}).`
+      : null,
+    projects.length > 0 && raw.projects.length > projects.length
+      ? `Projets retenus pour leur lien avec l'offre : ${projects.map((project) => project.name).join(", ")}.`
+      : null,
+  ].filter((item): item is string => item !== null);
+
   const advice = adviceFromAnalysis(analysis);
+  advice.push(
+    "La génération automatique trie et sélectionne sans réécrire : pour une accroche et des réalisations reformulées pour l'offre, utilise « Via mon abonnement ».",
+  );
   if (raw.experiences.length === 0) {
     advice.unshift(
       "Ton profil ne contient aucune expérience : renseigne « Mes expériences » ou utilise la génération par IA, qui s'appuie aussi sur ton CV PDF.",
@@ -121,6 +139,7 @@ export function tailorWithRules(
     projects,
     education,
     advice,
+    changes,
   };
 }
 
@@ -142,7 +161,9 @@ export const aiTailorSchema = z.object({
       company: z.string(),
       location: z.string().nullable(),
       period: z.string(),
-      bullets: z.array(z.string()).describe("2 à 5 réalisations reformulées, les plus pertinentes d'abord."),
+      bullets: z
+        .array(z.string())
+        .describe("3 à 5 réalisations réécrites pour l'offre si l'expérience est pertinente, 1 ou 2 sinon."),
     }),
   ),
   projects: z.array(
@@ -164,17 +185,28 @@ export const aiTailorSchema = z.object({
     }),
   ),
   advice: z.array(z.string()).describe("2 à 4 conseils pour finaliser ce CV."),
+  changes: z
+    .array(z.string())
+    .describe("4 à 8 modifications concrètes apportées par rapport au CV d'origine."),
 });
 
-export const TAILOR_SYSTEM_PROMPT = `Tu es une experte en rédaction de CV. Tu adaptes le CV d'un candidat à une offre d'emploi précise.
+export const TAILOR_SYSTEM_PROMPT = `Tu es une experte en recrutement tech et en rédaction de CV. Tu transformes le CV générique d'un candidat en un CV ciblé pour une offre précise. Le résultat doit être visiblement adapté à l'offre — un recruteur doit y retrouver en quelques secondes ce qu'il cherche — tout en restant strictement fidèle au parcours réel.
 
-Règles impératives :
-- N'invente rien : aucune expérience, entreprise, date, diplôme, chiffre ou compétence absents du CV ou du profil fournis.
-- Tu peux sélectionner, réordonner, condenser et reformuler les éléments existants pour mettre en avant ce qui correspond à l'offre, et reprendre le vocabulaire de l'annonce uniquement quand il décrit fidèlement une expérience réelle.
-- Pour chaque expérience, projet ou formation présent dans le profil, renseigne son identifiant (exp-N, proj-N, edu-N). Recopie à l'identique postes, entreprises et périodes du CV.
-- Ordre : expériences de la plus récente à la plus ancienne, au maximum 6 ; au plus 3 projets ; réalisations concises commençant par un verbe d'action.
-- Rédige en français, sans tutoyer (le CV s'adresse à un recruteur), sans pronom personnel.
-- Les conseils (advice) s'adressent au candidat et le tutoient.`;
+Méthode :
+1. Analyse l'offre : poste visé, 5 à 8 exigences principales (compétences, outils, responsabilités) et vocabulaire clé. Si une analyse de l'offre est fournie, appuie-toi dessus.
+2. Titre (headline) : l'intitulé du poste visé, ajusté si besoin pour rester exact au regard du parcours (ex. « Ingénieur QA Automatisation »).
+3. Accroche (summary) : réécris-la entièrement, en 3 ou 4 phrases orientées vers ce poste : profil et années d'expérience, compétences demandées par l'offre que le candidat possède, une réalisation pertinente. Ne recopie pas l'accroche d'origine.
+4. Compétences (skillGroups) : 3 à 5 groupes aux intitulés proches du vocabulaire de l'offre, 4 à 8 éléments chacun. D'abord les compétences exigées par l'offre que le candidat possède. Retire celles qui ne servent pas ce poste (elles restent dans son profil). Ajoute un groupe « Langues » si pertinent.
+5. Expériences (de la plus récente à la plus ancienne, 6 au maximum) :
+   - expériences pertinentes : 3 à 5 réalisations réécrites pour mettre en avant ce qui répond aux exigences de l'offre (verbe d'action, contexte, résultat), avec le vocabulaire de l'offre quand il décrit fidèlement ce qui a été fait, les plus pertinentes en premier ;
+   - expériences peu pertinentes : 1 ou 2 réalisations condensées.
+6. Projets : uniquement ceux qui servent la candidature (0 à 3).
+7. changes : 4 à 8 modifications concrètes que tu as faites, formulées brièvement (ex. « Accroche recentrée sur l'automatisation des tests », « Cypress et Playwright placés en tête des compétences »).
+
+Fidélité (impératif) :
+- N'invente aucune expérience, entreprise, date, diplôme, chiffre, outil ni compétence absents du CV ou du profil. Une compétence demandée par l'offre que le candidat ne possède pas n'apparaît pas dans le CV : signale-la dans advice.
+- Pour chaque expérience, projet ou formation présent dans le profil, renseigne son identifiant (exp-N, proj-N, edu-N) et recopie à l'identique postes, entreprises et périodes.
+- Rédige le CV en français, sans pronom personnel. advice s'adresse au candidat et le tutoie.`;
 
 function refIndex(ref: string | null, prefix: string): number | null {
   const match = ref?.match(new RegExp(`^\\[?${prefix}-(\\d+)\\]?$`));
@@ -255,6 +287,7 @@ export function toTailoredContent(output: AiTailorOutput, data: CandidateData): 
     projects,
     education,
     advice: output.advice,
+    changes: output.changes,
   };
 }
 
@@ -263,13 +296,14 @@ export async function tailorWithAi(
   userId: string,
   data: CandidateData,
   offer: Offer,
+  analysis: AnalysisDetails | null = null,
 ): Promise<{ content: TailoredResumeContent; model: string }> {
   const { data: output, model } = await generateStructured({
     userId,
     kind: "TAILORING",
     system: TAILOR_SYSTEM_PROMPT,
     schema: aiTailorSchema,
-    content: buildUserContent(data, offer, TAILOR_TASK),
+    content: buildUserContent(data, offer, TAILOR_TASK, describeAnalysis(analysis)),
   });
   return { content: toTailoredContent(output, data), model };
 }

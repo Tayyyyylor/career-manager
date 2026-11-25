@@ -40,6 +40,26 @@ Les rubriques (profil, compétences, expériences…) servent ensuite à relire 
 corriger : leurs **dates d'expérience** comptent dans la note et leur contenu
 alimente les CV adaptés.
 
+## CV adaptés à une offre
+
+Depuis la page d'une offre, trois façons de générer un CV ciblé :
+
+| Méthode | Ce qui change par rapport au CV générique |
+| --- | --- |
+| Automatique | Tri et sélection : compétences demandées en tête, réalisations et projets les plus pertinents d'abord (pas de réécriture) |
+| Via mon abonnement / IA | Titre et accroche réécrits pour le poste, compétences regroupées et filtrées selon l'offre, réalisations reformulées dans le vocabulaire de l'annonce, en s'appuyant sur l'analyse de l'offre |
+
+Un encart **« Ce qui a été adapté »** liste les modifications. L'IA ne peut rien
+inventer : postes, entreprises et dates viennent de tes données, et les
+compétences absentes de ton parcours sont retirées.
+
+**Mise en forme** : trois modèles (Moderne à deux colonnes, Classique, Épuré),
+une couleur et une police au choix. La couleur et la police de ton CV d'origine
+sont **détectées dans le PDF** et proposées par défaut ; le dernier style
+choisi est réutilisé pour les CV suivants. Pour obtenir le PDF : « Imprimer /
+PDF » → « Enregistrer au format PDF », en activant les graphiques
+d'arrière-plan.
+
 ## Comment fonctionne la notation ?
 
 Deux moteurs produisent le même format de résultat (note sur 100, convertie

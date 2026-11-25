@@ -50,6 +50,7 @@ export const getTailoredResume = cache(async (id: string) => {
       id: true,
       title: true,
       content: true,
+      style: true,
       method: true,
       createdAt: true,
       jobOffer: { select: { id: true, title: true, company: true } },

@@ -6,6 +6,9 @@ import { loadCandidate } from "@/features/analysis/candidate";
 import { parseAnalysisDetails } from "@/features/analysis/types";
 import { analysisMethodSchema, type AnalysisMethodInput } from "@/features/offers/schemas";
 import { extractPdfText, MAX_PDF_BYTES, PdfError } from "@/features/resumes/pdf";
+import { detectPdfStyle } from "@/features/resumes/style/detect";
+import { initialTailoredStyle } from "@/features/resumes/style/server";
+import { resumeStyleSchema, type ResumeStyle } from "@/features/resumes/style/types";
 import { tailorWithAi, tailorWithRules } from "@/features/resumes/tailor";
 import type { TailoredResumeContent } from "@/features/resumes/tailored";
 import type { AnalysisMethod } from "@/generated/prisma/enums";
@@ -29,6 +32,7 @@ export async function generateTailoredResume(
   if (!offer) return failure("Offre introuvable.");
 
   const latest = offer.analyses[0];
+  const latestDetails = latest ? parseAnalysisDetails(latest.details) : null;
   const data = await loadCandidate(user.id, latest?.resumeId ?? null);
 
   let content: TailoredResumeContent | undefined;
@@ -40,7 +44,7 @@ export async function generateTailoredResume(
       fallbackReason = "L'IA n'est pas configurée sur ce serveur.";
     } else {
       try {
-        content = (await tailorWithAi(user.id, data, offer)).content;
+        content = (await tailorWithAi(user.id, data, offer, latestDetails)).content;
         usedMethod = "AI";
       } catch (error) {
         if (!(error instanceof AiError)) throw error;
@@ -49,7 +53,7 @@ export async function generateTailoredResume(
     }
   }
 
-  content ??= tailorWithRules(data, offer, latest ? parseAnalysisDetails(latest.details) : null);
+  content ??= tailorWithRules(data, offer, latestDetails);
 
   const resume = await db.resume.create({
     data: {
@@ -59,6 +63,7 @@ export async function generateTailoredResume(
       method: usedMethod,
       jobOfferId: offer.id,
       content,
+      style: await initialTailoredStyle(user.id),
     },
     select: { id: true },
   });
@@ -111,6 +116,7 @@ export async function uploadResume(
       fileSize: file.size,
       fileData: bytes,
       extractedText: text || null,
+      style: await detectPdfStyle(bytes),
     },
     select: { id: true },
   });
@@ -166,4 +172,17 @@ export async function deleteResume(id: string): Promise<ActionResult> {
 
   refresh();
   return success(undefined, "CV supprimé.");
+}
+
+export async function updateResumeStyle(id: string, style: ResumeStyle): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = resumeStyleSchema.safeParse(style);
+  if (!parsed.success) return failure("Style invalide.");
+
+  const { count } = await db.resume.updateMany({
+    where: { id, userId: user.id, kind: "TAILORED" },
+    data: { style: parsed.data },
+  });
+  if (count === 0) return failure("CV introuvable.");
+  return success();
 }

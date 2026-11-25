@@ -128,11 +128,13 @@
     @apply font-sans;
   }
 }
-/* ─── Impression des CV adaptés ─────────────────────────────────────────── */
+/* ─── Impression ────────────────────────────────────────────────────────────
+   La barre latérale, l'en-tête et les notifications disparaissent ; le contenu
+   occupe toute la page. Le CV gère ses propres marges (bandeau pleine page). */
 @media print {
   @page {
     size: A4;
-    margin: 12mm 14mm;
+    margin: 0;
   }
 
   html,
@@ -140,18 +142,25 @@
     background: #fff !important;
   }
 
-  body * {
-    visibility: hidden;
+  [data-slot="sidebar"],
+  [data-sonner-toaster] {
+    display: none !important;
   }
 
-  #cv-document,
-  #cv-document * {
-    visibility: visible;
+  [data-slot="sidebar-wrapper"],
+  [data-slot="sidebar-inset"] {
+    display: block !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
   }
+}
 
-  #cv-document {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-  }
+/* Les couleurs du CV (bandeau, pastilles) sont imprimées telles quelles. */
+#cv-document,
+#cv-document * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }

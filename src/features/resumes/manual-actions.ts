@@ -3,13 +3,15 @@
 import { refresh } from "next/cache";
 
 import { loadCandidate } from "@/features/analysis/candidate";
-import { buildManualBody } from "@/features/analysis/prompt-context";
+import { buildManualBody, describeAnalysis } from "@/features/analysis/prompt-context";
+import { parseAnalysisDetails } from "@/features/analysis/types";
 import {
   aiTailorSchema,
   TAILOR_SYSTEM_PROMPT,
   TAILOR_TASK,
   toTailoredContent,
 } from "@/features/resumes/tailor";
+import { initialTailoredStyle } from "@/features/resumes/style/server";
 import { failure, success, type ActionResult } from "@/lib/action-result";
 import { db } from "@/lib/db";
 import { buildManualPrompt, parseManualResponse } from "@/lib/manual-ai";
@@ -19,11 +21,14 @@ import { requireUser } from "@/lib/session";
 async function loadContext(userId: string, offerId: string) {
   const offer = await db.jobOffer.findFirst({
     where: { id: offerId, userId },
-    include: { analyses: { orderBy: { createdAt: "desc" }, take: 1, select: { resumeId: true } } },
+    include: {
+      analyses: { orderBy: { createdAt: "desc" }, take: 1, select: { resumeId: true, details: true } },
+    },
   });
   if (!offer) return null;
-  const data = await loadCandidate(userId, offer.analyses[0]?.resumeId ?? null);
-  return { offer, data };
+  const latest = offer.analyses[0];
+  const data = await loadCandidate(userId, latest?.resumeId ?? null);
+  return { offer, data, analysis: describeAnalysis(latest ? parseAnalysisDetails(latest.details) : null) };
 }
 
 /** Demande de CV adapté à coller dans claude.ai. */
@@ -35,7 +40,7 @@ export async function getManualTailorPrompt(offerId: string): Promise<ActionResu
   return success({
     prompt: buildManualPrompt({
       instructions: TAILOR_SYSTEM_PROMPT,
-      body: buildManualBody(context.data, context.offer, TAILOR_TASK),
+      body: buildManualBody(context.data, context.offer, TAILOR_TASK, context.analysis),
       schema: aiTailorSchema,
     }),
   });
@@ -62,6 +67,7 @@ export async function submitManualTailor(
       method: "AI",
       jobOfferId: offer.id,
       content: toTailoredContent(parsed.data, context.data),
+      style: await initialTailoredStyle(user.id),
     },
     select: { id: true },
   });
