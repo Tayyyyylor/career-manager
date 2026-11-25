@@ -1,0 +1,219 @@
+// Schéma de données de Career Manager.
+// Documentation : https://pris.ly/d/prisma-schema
+//
+// Application mono-utilisateur : pas de modèle User pour l'instant.
+// Le profil est une ligne unique (singleton) gérée côté application.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Profil ──────────────────────────────────────────────────────────────────
+
+model Profile {
+  id          String   @id @default(cuid())
+  firstName   String?
+  lastName    String?
+  headline    String?
+  summary     String?
+  email       String?
+  phone       String?
+  location    String?
+  websiteUrl  String?
+  linkedinUrl String?
+  githubUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Compétences ─────────────────────────────────────────────────────────────
+
+enum SkillCategory {
+  TECHNICAL
+  TOOL
+  METHODOLOGY
+  SOFT
+  LANGUAGE
+  OTHER
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+model Skill {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  category    SkillCategory @default(TECHNICAL)
+  level       SkillLevel?
+  experiences Experience[]
+  projects    Project[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// ─── Expériences ─────────────────────────────────────────────────────────────
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  FREELANCE
+  INTERNSHIP
+  APPRENTICESHIP
+  TEMPORARY
+}
+
+model Experience {
+  id             String          @id @default(cuid())
+  position       String
+  company        String
+  location       String?
+  employmentType EmploymentType?
+  startDate      DateTime        @db.Date
+  /// `null` signifie que le poste est en cours.
+  endDate        DateTime?       @db.Date
+  description    String?
+  achievements   String[]
+  skills         Skill[]
+  projects       Project[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([startDate])
+}
+
+// ─── Projets ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id            String      @id @default(cuid())
+  name          String
+  description   String?
+  role          String?
+  url           String?
+  repositoryUrl String?
+  startDate     DateTime?   @db.Date
+  endDate       DateTime?   @db.Date
+  experienceId  String?
+  experience    Experience? @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+  skills        Skill[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([experienceId])
+}
+
+// ─── Formations ──────────────────────────────────────────────────────────────
+
+model Education {
+  id           String    @id @default(cuid())
+  institution  String
+  degree       String
+  fieldOfStudy String?
+  location     String?
+  startDate    DateTime? @db.Date
+  endDate      DateTime? @db.Date
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── Offres d'emploi & analyses ──────────────────────────────────────────────
+
+model JobOffer {
+  id           String          @id @default(cuid())
+  title        String
+  company      String?
+  location     String?
+  sourceUrl    String?
+  /// Texte brut de l'annonce (collé ou extrait depuis l'URL).
+  description  String
+  analyses     OfferAnalysis[]
+  resumes      Resume[]
+  applications Application[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+/// Résultat de la comparaison entre une offre et un CV.
+model OfferAnalysis {
+  id         String   @id @default(cuid())
+  jobOfferId String
+  jobOffer   JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  resumeId   String?
+  resume     Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  score      Int
+  /// Barème de la note (ex. 100 ou 20).
+  maxScore   Int      @default(100)
+  /// Détail du calcul (critères, points forts, manques…). Structure à définir.
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([jobOfferId])
+  @@index([resumeId])
+}
+
+// ─── CV ──────────────────────────────────────────────────────────────────────
+
+enum ResumeKind {
+  /// CV générique importé (PDF de référence).
+  GENERIC
+  /// CV adapté à une offre précise.
+  TAILORED
+}
+
+model Resume {
+  id           String          @id @default(cuid())
+  title        String
+  kind         ResumeKind      @default(GENERIC)
+  fileName     String?
+  /// Chemin du fichier dans le stockage (local ou distant).
+  filePath     String?
+  mimeType     String?
+  fileSize     Int?
+  jobOfferId   String?
+  jobOffer     JobOffer?       @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
+  analyses     OfferAnalysis[]
+  applications Application[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([jobOfferId])
+}
+
+// ─── Candidatures ────────────────────────────────────────────────────────────
+
+enum ApplicationStatus {
+  TO_APPLY
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id         String            @id @default(cuid())
+  company    String
+  position   String
+  status     ApplicationStatus @default(TO_APPLY)
+  appliedAt  DateTime?         @db.Date
+  notes      String?
+  jobOfferId String?
+  jobOffer   JobOffer?         @relation(fields: [jobOfferId], references: [id], onDelete: SetNull)
+  resumeId   String?
+  resume     Resume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([status])
+  @@index([jobOfferId])
+  @@index([resumeId])
+}

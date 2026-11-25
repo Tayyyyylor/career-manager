@@ -1,0 +1,23 @@
+import * as React from "react";
+
+const MOBILE_BREAKPOINT = 768;
+const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
+
+function subscribe(onChange: () => void) {
+  const media = window.matchMedia(MOBILE_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getSnapshot() {
+  return window.matchMedia(MOBILE_QUERY).matches;
+}
+
+/** `false` côté serveur, puis la valeur réelle dès l'hydratation. */
+function getServerSnapshot() {
+  return false;
+}
+
+export function useIsMobile(): boolean {
+  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
